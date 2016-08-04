@@ -27,7 +27,7 @@ var levelOptions = {
       // this is never called (because I never request the key)
       var key = JSON.parse(val)
       if (key.length === 2) {
-        var num = Number.parseInt(key[1])
+        var num = Number.parseInt(key[1], 10)
         if (!Number.isNaN(num)) {
           key[1] = num
         }
@@ -83,7 +83,7 @@ function extend (Y) {
           .on('data', function (value) {
             resolve(value)
           })
-          .on('err', function () {
+          .on('err', function (err) {
             console.log('err', err)
           })
           .on('end', function () {
@@ -102,7 +102,7 @@ function extend (Y) {
           .on('data', function (value) {
             resolve(value)
           })
-          .on('err', function () {
+          .on('err', function (err) {
             console.log('err', err)
           })
           .on('end', function () {
@@ -219,10 +219,6 @@ function extend (Y) {
         }
         options.dir = options.dir || '.'
         var dbpath = path.join(options.dir, options.namespace)
-        
-        var store = this
-        
-        debugger
         this.ready = new Promise(function (resolve) {
           mkdirp(dbpath, function (err) {
             if (err) throw err
@@ -255,7 +251,7 @@ function extend (Y) {
 
           var gen = makeGen.call(transaction)
           handleTransactions(gen.next())
-          
+
           function handleTransactions (result) {
             var request = result.value
             if (result.done) {
