@@ -1,22 +1,18 @@
-# IndexedDB database adapter for [Yjs](https://github.com/y-js/yjs)
+# LevelDB database adapter for [Yjs](https://github.com/y-js/yjs)
 
-Use the IndexedDB database adapter to store your shared data persistently in the browser. The next time you join the session, your changes will still be there.
-
-* Minimizes the amount of data exchanged between server and client
-* Makes offline editing possible
-* Not supported by all browsers (see [mdn](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API))
+Use the LevelDB database adapter to store your shared data persistently in NodeJs applications. The changes will persist after restart.
 
 ## Use it!
 Install this with bower or npm.
 
 ##### Bower
 ```
-bower install y-indexeddb --save
+bower install y-leveldb --save
 ```
 
 ##### NPM
 ```
-npm install y-indexeddb --save
+npm install y-leveldb --save
 ```
 
 ### Example
@@ -24,13 +20,16 @@ npm install y-indexeddb --save
 ```
 Y({
   db: {
-    name: 'indexeddb'
+    name: 'leveldb',
+    namespace: 'textarea-example' (optional - defaults to connector.room),
+    dir: './db' // where the database is created,
+    cleanStart: false // (if true, overwrite existing content - great for debugging)
   },
   connector: {
     name: 'websockets-client', // choose the websockets connector
     // name: 'webrtc'
     // name: 'xmpp'
-    room: 'Textarea-example-dev'
+    room: 'textarea-example'
   },
   sourceDir: '/bower_components', // location of the y-* modules
   share: {
