@@ -26,16 +26,12 @@ Y({
     cleanStart: false // (if true, overwrite existing content - great for debugging)
   },
   connector: {
-    name: 'websockets-client', // choose the websockets connector
-    // name: 'webrtc'
-    // name: 'xmpp'
+    name: 'websockets-client', // use the websockets connector
     room: 'textarea-example'
   },
-  sourceDir: '/bower_components', // location of the y-* modules
   share: {
     textarea: 'Text' // y.share.textarea is of type Y.Text
   }
-  // types: ['Richtext', 'Array'] // optional list of types you want to import
 }).then(function (y) {
   // bind the textarea to a shared text element
   y.share.textarea.bind(document.getElementById('textfield'))
