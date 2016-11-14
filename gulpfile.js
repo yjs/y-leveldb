@@ -6,9 +6,9 @@ var runSequence = require('run-sequence').use(gulp)
 
 require('../yjs/gulpfile.helper.js')(gulp, {
   polyfills: [],
-  entry: './src/IndexedDB.js',
-  targetName: 'y-indexeddb.js',
-  moduleName: 'y-indexeddb',
+  entry: './src/LevelDB.js',
+  targetName: 'y-leveldb.js',
+  moduleName: 'yLeveldb',
   specs: []
 })
 
