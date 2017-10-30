@@ -56,6 +56,8 @@
     "yjs": "^12.0.0"
   },
   "dependencies": {
+    "levelup": "^1.0.0-4",
+    "leveldown": "^1.7.0-0",
     "level": "^1.4.0",
     "level-sublevel": "^6.5.4",
     "mkdirp": "^0.5.1"
