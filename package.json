@@ -1,6 +1,6 @@
 {
   "name": "y-leveldb",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "LevelDB database adapter for Yjs",
   "main": "./src/LevelDB.js",
   "scripts": {
