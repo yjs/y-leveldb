@@ -5,11 +5,6 @@ Use the LevelDB database adapter to store your shared data persistently in NodeJ
 ## Use it!
 Install this with bower or npm.
 
-##### Bower
-```
-bower install y-leveldb --save
-```
-
 ##### NPM
 ```
 npm install y-leveldb --save
