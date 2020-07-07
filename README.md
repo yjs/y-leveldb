@@ -1,39 +1,23 @@
-# LevelDB database adapter for [Yjs](https://github.com/y-js/yjs)
+# LevelDB database adapter for [Yjs](https://github.com/yjs/yjs)
 
-Use the LevelDB database adapter to store your shared data persistently in NodeJs applications. The changes will persist after restart.
+Use the IndexedDB database adapter to store your shared data persistently in
+the browser. The next time you join the session, your changes will still be
+there.
 
-## Use it!
+* Minimizes the amount of data exchanged between server and client
+* Makes offline editing possible
+* Not supported by all browsers (see [mdn](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API))
+
+## Use it
+
 Install this with bower or npm.
 
-##### NPM
-```
+```sh
 npm install y-leveldb --save
 ```
 
-### Example
-
-```
-Y({
-  db: {
-    name: 'leveldb',
-    namespace: 'textarea-example' (optional - defaults to connector.room),
-    dir: './db' // where the database is created,
-    cleanStart: false // (if true, overwrite existing content - great for debugging)
-  },
-  connector: {
-    name: 'websockets-client', // use the websockets connector
-    room: 'textarea-example'
-  },
-  share: {
-    textarea: 'Text' // y.share.textarea is of type Y.Text
-  }
-}).then(function (y) {
-  // bind the textarea to a shared text element
-  y.share.textarea.bind(document.getElementById('textfield'))
-}
-```
-
 ## License
+
 Yjs is licensed under the [MIT License](./LICENSE).
 
-<kevin.jahns@rwth-aachen.de>
+<kevin.jahns@protonmail.com>
