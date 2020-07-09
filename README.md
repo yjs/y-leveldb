@@ -51,16 +51,16 @@ import level from 'level-mem'
 const persistence = new LeveldbPersistence('./storage-location', { level })
 ```
 
-### `persistence.getYDoc(docName: string): Promise<Y.Doc>`
+#### `persistence.getYDoc(docName: string): Promise<Y.Doc>`
 
 Create a Y.Doc instance with the data persistet in leveldb. Use this to
 temporarily create a Yjs document to sync changes or extract data.
 
-### `persistence.storeUpdate(docName: string, update: Uint8Array): Promise`
+#### `persistence.storeUpdate(docName: string, update: Uint8Array): Promise`
 
 Store a single document update to the database.
 
-### `persistence.getStateVector(docName: string): Promise<Uint8Array>`
+#### `persistence.getStateVector(docName: string): Promise<Uint8Array>`
 
 The state vector (describing the state of the persisted document - see
 [Yjs docs](https://github.com/yjs/yjs#Document-Updates)) is maintained in a separate
@@ -68,35 +68,35 @@ field and constantly updated.
 
 This allows you to sync changes without actually creating a Yjs document.
 
-### `persistence.getDiff(docName: string, stateVector: Uint8Array): Promise<Uint8Array>`
+#### `persistence.getDiff(docName: string, stateVector: Uint8Array): Promise<Uint8Array>`
 
 Get the differences directly from the database. The same as
 `Y.encodeStateAsUpdate(ydoc, stateVector)`.
 
-### `persistence.clearDocument(docName: string): Promise`
+#### `persistence.clearDocument(docName: string): Promise`
 
 Delete a document, and all associated data from the database.
 
-### `persistence.setMeta(docName: string, metaKey: string, value: any): Promise`
+#### `persistence.setMeta(docName: string, metaKey: string, value: any): Promise`
 
 Persist some meta information in the database and associate it with a document.
 It is up to you what you store here. You could, for example, store credentials
 here.
 
-### `persistence.getMeta(docName: string, metaKey: string): Promise<any|undefined>`
+#### `persistence.getMeta(docName: string, metaKey: string): Promise<any|undefined>`
 
 Retrieve a store meta value from the database. Returns undefined if the
 `metaKey` doesn't exist.
 
-### `persistence.delMeta(docName: string, metaKey: string): Promise`
+#### `persistence.delMeta(docName: string, metaKey: string): Promise`
 
 Delete a store meta value.
 
-### `persistence.getAllDocNames(docName: string): Promise<Array<string>>`
+#### `persistence.getAllDocNames(docName: string): Promise<Array<string>>`
 
 Retrieve the names of all stored documents.
 
-### `persistence.getAllDocStateVectors(docName: string): Promise<Array<{ name:string,clock:number,sv:Uint8Array}`
+#### `persistence.getAllDocStateVectors(docName: string): Promise<Array<{ name:string,clock:number,sv:Uint8Array}`
 
 Retrieve the state vectors of all stored documents. You can use this to sync
 two y-leveldb instances.
@@ -104,13 +104,13 @@ two y-leveldb instances.
 Note: The state vectors might be outdated if the associated document is not
 yet flushed. So use with caution.
 
-### `persistence.flushDocument(docName: string): Promise` (dev only)
+#### `persistence.flushDocument(docName: string): Promise` (dev only)
 
 Internally y-leveldb stores incremental updates. You can merge all document
 updates to a single entry. You probably never have to use this.
 
 ## License
 
-Yjs is licensed under the [MIT License](./LICENSE).
+y-leveldb is licensed under the [MIT License](./LICENSE).
 
 <kevin.jahns@protonmail.com>
