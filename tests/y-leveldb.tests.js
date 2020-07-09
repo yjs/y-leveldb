@@ -2,9 +2,10 @@
 import * as Y from 'yjs'
 import { PREFERRED_TRIM_SIZE, LevelDbPersistence, getLevelUpdates } from '../src/y-leveldb.js'
 import * as t from 'lib0/testing.js'
-// @ts-ignore
-import level from 'level-mem'
 import * as decoding from 'lib0/decoding.js'
+
+// When changing this, also make sure to change the file in gitignore
+const storageName = 'tmp-leveldb-storage'
 
 /**
  * Read state vector from Decoder and return as Map. This is a helper method that will be exported by Yjs directly.
@@ -48,127 +49,163 @@ const flushUpdatesHelper = (ldb, docName, updates) =>
 /**
  * @param {t.TestCase} tc
  */
-export const testLeveldbBUpdateStorage = async tc => {
-  const docName = 'my level doc'
+export const testLeveldbUpdateStorage = async tc => {
+  const docName = tc.testName
   const ydoc1 = new Y.Doc()
   ydoc1.clientID = 0 // so we can check the state vector
-  const leveldbPersistence = new LevelDbPersistence('tmp-storage', { level })
+  const leveldbPersistence = new LevelDbPersistence(storageName)
+  await leveldbPersistence.clearDocument(docName)
   const updates = []
 
   ydoc1.on('update', update => {
     updates.push(update)
   })
 
-  ydoc1.getArray('').insert(0, [1])
-  ydoc1.getArray('').insert(0, [2])
+  ydoc1.getArray('arr').insert(0, [1])
+  ydoc1.getArray('arr').insert(0, [2])
 
   await flushUpdatesHelper(leveldbPersistence, docName, updates)
 
-  const sv = decodeStateVector(await leveldbPersistence.getStateVector(docName))
+  const encodedSv = await leveldbPersistence.getStateVector(docName)
+  const sv = decodeStateVector(encodedSv)
   t.assert(sv.size === 1)
   t.assert(sv.get(0) === 2)
 
   const ydoc2 = await leveldbPersistence.getYDoc(docName)
-  t.compareArrays(ydoc2.getArray('').toArray(), [1, 2])
+  t.compareArrays(ydoc2.getArray('arr').toArray(), [2, 1])
+
+  await leveldbPersistence.destroy()
 }
 
-// /**
-//  * @param {t.TestCase} tc
-//  */
-// export const testEncodeMillionUpdates = async tc => {
-//   const million = 1000000
-//   const docName = 'my level doc'
-//   const ydoc1 = new Y.Doc()
-//   ydoc1.clientID = 0 // so we can check the state vector
-//   const leveldbPersistence = new LevelDbPersistence('tmp-storage', { level })
+/**
+ * @param {t.TestCase} tc
+ */
+export const testEncodeManyUpdates = async tc => {
+  const N = PREFERRED_TRIM_SIZE * 7
+  const docName = tc.testName
+  const ydoc1 = new Y.Doc()
+  ydoc1.clientID = 0 // so we can check the state vector
+  const leveldbPersistence = new LevelDbPersistence(storageName)
+  await leveldbPersistence.clearDocument(docName)
 
-//   const updates = []
+  const updates = []
 
-//   ydoc1.on('update', update => {
-//     updates.push(update)
-//   })
-//   await flushUpdatesHelper(leveldbPersistence, docName, updates)
+  ydoc1.on('update', update => {
+    updates.push(update)
+  })
+  await flushUpdatesHelper(leveldbPersistence, docName, updates)
 
-//   const keys = await getLevelUpdates(leveldbPersistence.db, docName, { keys: true, values: false })
+  const keys = await leveldbPersistence._transact(db => getLevelUpdates(db, docName, { keys: true, values: false }))
 
-//   for (let i = 0; i < keys.length; i++) {
-//     t.assert(keys[i][3] === i)
-//   }
+  for (let i = 0; i < keys.length; i++) {
+    t.assert(keys[i][3] === i)
+  }
 
-//   const yarray = ydoc1.getArray('')
-//   for (let i = 0; i < million; i++) {
-//     yarray.insert(0, [i])
-//   }
-//   await flushUpdatesHelper(leveldbPersistence, docName, updates)
+  const yarray = ydoc1.getArray('arr')
+  for (let i = 0; i < N; i++) {
+    yarray.insert(0, [i])
+  }
+  await flushUpdatesHelper(leveldbPersistence, docName, updates)
 
-//   const ydoc2 = await leveldbPersistence.getYDoc(docName)
-//   t.assert(ydoc2.getArray('').length === million)
+  const ydoc2 = await leveldbPersistence.getYDoc(docName)
+  t.assert(ydoc2.getArray('arr').length === N)
 
-//   await leveldbPersistence.flushDocument(docName)
-//   const mergedKeys = await getLevelUpdates(leveldbPersistence.db, docName, { keys: true, values: false })
-//   t.assert(mergedKeys.length === 1)
+  await leveldbPersistence.flushDocument(docName)
+  const mergedKeys = await leveldbPersistence._transact(db => getLevelUpdates(db, docName, { keys: true, values: false }))
+  t.assert(mergedKeys.length === 1)
 
-//   // getYDoc still works after flush/merge
-//   const ydoc3 = await leveldbPersistence.getYDoc(docName)
-//   t.assert(ydoc3.getArray('').length === million)
-// }
+  // getYDoc still works after flush/merge
+  const ydoc3 = await leveldbPersistence.getYDoc(docName)
+  t.assert(ydoc3.getArray('arr').length === N)
 
-// /**
-//  * @param {t.TestCase} tc
-//  */
-// export const testDiff = async tc => {
-//   const N = PREFERRED_TRIM_SIZE * 7 // primes are awesome - ensure that the document is at least flushed once
-//   const docName = 'my level doc'
-//   const ydoc1 = new Y.Doc()
-//   ydoc1.clientID = 0 // so we can check the state vector
-//   const leveldbPersistence = new LevelDbPersistence('tmp-storage', { level })
+  // test if state vector is properly generated
+  t.compare(Y.encodeStateVector(ydoc1), await leveldbPersistence.getStateVector(docName))
+  // add new update so that sv needs to be updated
+  ydoc1.getArray('arr').insert(0, ['new'])
+  await flushUpdatesHelper(leveldbPersistence, docName, updates)
+  t.compare(Y.encodeStateVector(ydoc1), await leveldbPersistence.getStateVector(docName))
 
-//   const updates = []
-//   ydoc1.on('update', update => {
-//     updates.push(update)
-//   })
+  await leveldbPersistence.destroy()
+}
 
-//   const yarray = ydoc1.getArray('')
-//   // create N changes
-//   for (let i = 0; i < N; i++) {
-//     yarray.insert(0, [i])
-//   }
-//   await flushUpdatesHelper(leveldbPersistence, docName, updates)
+/**
+ * @param {t.TestCase} tc
+ */
+export const testDiff = async tc => {
+  const N = PREFERRED_TRIM_SIZE * 2 // primes are awesome - ensure that the document is at least flushed once
+  const docName = tc.testName
+  const ydoc1 = new Y.Doc()
+  ydoc1.clientID = 0 // so we can check the state vector
+  const leveldbPersistence = new LevelDbPersistence(storageName)
+  await leveldbPersistence.clearDocument(docName)
 
-//   // create partially merged doc
-//   const ydoc2 = await leveldbPersistence.getYDoc(docName)
+  const updates = []
+  ydoc1.on('update', update => {
+    updates.push(update)
+  })
 
-//   // another N updates
-//   for (let i = 0; i < N; i++) {
-//     yarray.insert(0, [i])
-//   }
-//   await flushUpdatesHelper(leveldbPersistence, docName, updates)
+  const yarray = ydoc1.getArray('arr')
+  // create N changes
+  for (let i = 0; i < N; i++) {
+    yarray.insert(0, [i])
+  }
+  await flushUpdatesHelper(leveldbPersistence, docName, updates)
 
-//   // apply diff to doc
-//   const diffUpdate = await leveldbPersistence.getDiff(docName, Y.encodeStateVector(ydoc2))
-//   Y.applyUpdate(ydoc2, diffUpdate)
+  // create partially merged doc
+  const ydoc2 = await leveldbPersistence.getYDoc(docName)
 
-//   t.assert(ydoc2.getArray('').length === ydoc1.getArray('').length)
-//   t.assert(ydoc2.getArray('').length === N * 2)
-// }
+  // another N updates
+  for (let i = 0; i < N; i++) {
+    yarray.insert(0, [i])
+  }
+  await flushUpdatesHelper(leveldbPersistence, docName, updates)
 
-// /**
-//  * @param {t.TestCase} tc
-//  */
-// export const testMetas = async tc => {
-//   const leveldbPersistence = new LevelDbPersistence('tmp-storage', { level })
-//   await leveldbPersistence.setMeta('test', 'a', 4)
-//   await leveldbPersistence.setMeta('test', 'a', 5)
-//   await leveldbPersistence.setMeta('test', 'b', 4)
-//   const a = await leveldbPersistence.getMeta('test', 'a')
-//   const b = await leveldbPersistence.getMeta('test', 'b')
-//   t.assert(a === 5)
-//   t.assert(b === 4)
-//   const metas = await leveldbPersistence.getMetas('test')
-//   t.assert(metas.size === 2)
-//   t.assert(metas.get('a') === 5)
-//   t.assert(metas.get('b') === 4)
-//   await leveldbPersistence.clearDocument('test')
-//   const metasEmpty = await leveldbPersistence.getMetas('test')
-//   t.assert(metasEmpty.size === 2)
-// }
+  // apply diff to doc
+  const diffUpdate = await leveldbPersistence.getDiff(docName, Y.encodeStateVector(ydoc2))
+  Y.applyUpdate(ydoc2, diffUpdate)
+
+  t.assert(ydoc2.getArray('arr').length === ydoc1.getArray('arr').length)
+  t.assert(ydoc2.getArray('arr').length === N * 2)
+
+  await leveldbPersistence.destroy()
+}
+
+/**
+ * @param {t.TestCase} tc
+ */
+export const testMetas = async tc => {
+  const docName = tc.testName
+  const leveldbPersistence = new LevelDbPersistence(storageName)
+  await leveldbPersistence.clearDocument(docName)
+
+  await leveldbPersistence.setMeta(docName, 'a', 4)
+  await leveldbPersistence.setMeta(docName, 'a', 5)
+  await leveldbPersistence.setMeta(docName, 'b', 4)
+  const a = await leveldbPersistence.getMeta(docName, 'a')
+  const b = await leveldbPersistence.getMeta(docName, 'b')
+  t.assert(a === 5)
+  t.assert(b === 4)
+  const metas = await leveldbPersistence.getMetas(docName)
+  t.assert(metas.size === 2)
+  t.assert(metas.get('a') === 5)
+  t.assert(metas.get('b') === 4)
+  await leveldbPersistence.delMeta(docName, 'a')
+  const c = await leveldbPersistence.getMeta(docName, 'a')
+  t.assert(c === undefined)
+  await leveldbPersistence.clearDocument(docName)
+  const metasEmpty = await leveldbPersistence.getMetas(docName)
+  t.assert(metasEmpty.size === 0)
+
+  await leveldbPersistence.destroy()
+}
+
+export const testMisc = async tc => {
+  const docName = tc.testName
+  const leveldbPersistence = new LevelDbPersistence(storageName)
+  await leveldbPersistence.clearDocument(docName)
+
+  const sv = await leveldbPersistence.getStateVector('does not exist')
+  t.assert(sv.byteLength === 1)
+
+  await leveldbPersistence.destroy()
+}

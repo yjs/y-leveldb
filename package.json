@@ -1,6 +1,6 @@
 {
   "name": "y-leveldb",
-  "version": "9.0.3",
+  "version": "0.0.3",
   "description": "LevelDb database adapter for Yjs",
   "type": "module",
   "main": "./dist/y-leveldb.cjs",
@@ -13,10 +13,10 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "test": "npm run lint",
+    "test": "rollup -c && nyc --check-coverage --lines 100 --branches 100 --functions 100 --statements 100 node ./dist/test.cjs",
     "dist": "rollup -c",
     "lint": "markdownlint README.md && standard && tsc",
-    "preversion": "npm run clean && npm run lint && npm run dist",
+    "preversion": "npm run lint && npm run test && npm run clean && npm run dist && test -e dist/src/y-leveldb.d.ts && test -e dist/y-leveldb.cjs",
     "debug": "concurrently 'rollup -wc' 'http-server -o .'"
   },
   "files": [
@@ -56,10 +56,13 @@
     "@rollup/plugin-commonjs": "^13.0.0",
     "@rollup/plugin-node-resolve": "^8.1.0",
     "concurrently": "^3.6.1",
+    "http-server": "^0.12.3",
     "jsdoc": "^3.6.3",
     "level-mem": "^5.0.1",
     "markdownlint-cli": "^0.19.0",
+    "nyc": "^15.1.0",
     "rollup": "^2.20.0",
+    "rollup-plugin-node-polyfills": "^0.2.1",
     "standard": "^14.3.4",
     "typescript": "^3.9.6",
     "y-protocols": "^1.0.0",

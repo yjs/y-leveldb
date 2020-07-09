@@ -6,6 +6,7 @@ import * as promise from 'lib0/promise.js'
 import * as buffer from 'lib0/buffer.js'
 // @ts-ignore
 import defaultLevel from 'level'
+import { Buffer } from 'buffer'
 
 export const PREFERRED_TRIM_SIZE = 500
 
@@ -19,9 +20,42 @@ const valueEncoding = {
   decode: /** @param {any} data */ data => data
 }
 
-const keyEncoding = {
+/**
+ * Write two bytes as an unsigned integer in big endian order.
+ * (most significant byte first)
+ *
+ * @function
+ * @param {encoding.Encoder} encoder
+ * @param {number} num The number that is to be encoded.
+ */
+export const writeUint32BigEndian = (encoder, num) => {
+  for (let i = 3; i >= 0; i--) {
+    encoding.write(encoder, (num >>> (8 * i)) & binary.BITS8)
+  }
+}
+
+/**
+ * Read 4 bytes as unsigned integer in big endian order.
+ * (most significant byte first)
+ *
+ * @function
+ * @param {decoding.Decoder} decoder
+ * @return {number} An unsigned integer.
+ */
+export const readUint32BigEndian = decoder => {
+  const uint =
+    (decoder.arr[decoder.pos + 3] +
+    (decoder.arr[decoder.pos + 2] << 8) +
+    (decoder.arr[decoder.pos + 1] << 16) +
+    (decoder.arr[decoder.pos] << 24)) >>> 0
+  decoder.pos += 4
+  return uint
+}
+
+export const keyEncoding = {
   buffer: true,
   type: 'y-keys',
+  /* istanbul ignore next */
   encode: /** @param {Array<string|number>} arr */  arr => {
     const encoder = encoding.createEncoder()
     for (let i = 0; i < arr.length; i++) {
@@ -29,9 +63,9 @@ const keyEncoding = {
       if (typeof v === 'string') {
         encoding.writeUint8(encoder, YEncodingString)
         encoding.writeVarString(encoder, v)
-      } else if (typeof v === 'number') {
+      } else /* istanbul ignore else */ if (typeof v === 'number') {
         encoding.writeUint8(encoder, YEncodingUint32)
-        encoding.writeUint32(encoder, v)
+        writeUint32BigEndian(encoder, v)
       } else {
         throw new Error('Unexpected key value')
       }
@@ -47,7 +81,7 @@ const keyEncoding = {
           key.push(decoding.readVarString(decoder))
           break
         case YEncodingUint32:
-          key.push(decoding.readUint32(decoder))
+          key.push(readUint32BigEndian(decoder))
           break
       }
     }
@@ -64,13 +98,18 @@ const keyEncoding = {
  * @param {any} key
  */
 const levelGet = async (db, key) => {
+  let res
   try {
-    return await db.get(key)
+    res = await db.get(key)
   } catch (err) {
+    /* istanbul ignore else */
     if (err.notFound) {
       return null
+    } else {
+      throw err
     }
   }
+  return res
 }
 
 /**
@@ -140,6 +179,7 @@ export const getCurrentUpdateClock = (db, docName) => getLevelUpdates(db, docNam
  * @return {Promise<void>}
  */
 const clearRange = async (db, gte, lt) => {
+  /* istanbul ignore else */
   if (db.supports.clear) {
     await db.clear({ gte, lt })
   } else {
@@ -187,12 +227,16 @@ const createDocumentStateVectorKey = (docName) => ['v1', docName, 'sv']
 /**
  * @param {string} docName
  */
-const createDocumentFirstKey = (docName) => ['v1', docName] // we assume that this is the last key written for a document
+const createDocumentFirstKey = (docName) => ['v1', docName]
 
 /**
+ * We use this key as the upper limit of all keys that can be written.
+ * Make sure that all document keys are smaller! Strings are encoded using varLength string encoding,
+ * so we need to make sure that this key has the biggest size!
+ *
  * @param {string} docName
  */
-const createDocumentLastKey = (docName) => ['v1', docName, 'zzz'] // we assume that this is the last key written for a document
+const createDocumentLastKey = (docName) => ['v1', docName, 'zzzzzzz']
 
 // const emptyStateVector = (() => Y.encodeStateVector(new Y.Doc()))()
 
@@ -247,13 +291,13 @@ const readStateVector = async (db, docName) => {
  * @param {string} docName
  * @param {Uint8Array} stateAsUpdate
  * @param {Uint8Array} stateVector
- * @return {Promise<{clock:number, sv: Uint8Array}>}
+ * @return {Promise<number>} returns the clock of the flushed doc
  */
 const flushDocument = async (db, docName, stateAsUpdate, stateVector) => {
   const clock = await storeUpdate(db, docName, stateAsUpdate)
-  writeStateVector(db, docName, stateVector, clock)
-  clearUpdatesRange(db, docName, 0, clock) // intentionally not waiting for the promise to resolve!
-  return { clock, sv: stateVector }
+  await writeStateVector(db, docName, stateVector, clock)
+  await clearUpdatesRange(db, docName, 0, clock) // intentionally not waiting for the promise to resolve!
+  return clock
 }
 
 /**
@@ -275,20 +319,34 @@ export class LevelDbPersistence {
    * @param {any} [opts.level] Level-compatible adapter. E.g. leveldown, level-rem, level-indexeddb. Defaults to `level`
    * @param {object} [opts.levelOptions] Options that are passed down to the level instance
    */
-  constructor (location, { level = defaultLevel, levelOptions = {} } = {}) {
+  constructor (location, /* istanbul ignore next */ { level = defaultLevel, levelOptions = {} } = {}) {
     const db = level(location, { ...levelOptions, valueEncoding, keyEncoding })
     this.tr = promise.resolve()
     /**
      * Execute an transaction on a database. This will ensure that other processes are currently not writing.
+     *
+     * This is a private method and might change in the future.
+     *
+     * @todo only transact on the same room-name. Allow for concurrency of different rooms.
      *
      * @template T
      *
      * @param {function(any):Promise<T>} f A transaction that receives the db object
      * @return {Promise<T>}
      */
-    this.transact = f => {
-      const ret = this.tr.then(() => f(db))
-      this.tr = promise.create(resolve => ret.then(resolve, resolve))
+    this._transact = f => {
+      const currTr = this.tr
+      this.tr = (async () => {
+        await currTr
+        let res = /** @type {any} */ (null)
+        try {
+          res = await f(db)
+        } catch (err) {
+          /* istanbul ignore next */
+          console.warn('Error during y-leveldb transaction', err)
+        }
+        return res
+      })()
       return this.tr
     }
   }
@@ -297,11 +355,10 @@ export class LevelDbPersistence {
    * @param {string} docName
    */
   flushDocument (docName) {
-    return this.transact(async db => {
+    return this._transact(async db => {
       const updates = await getLevelUpdates(db, docName)
       const { update, sv } = mergeUpdates(updates)
-      const fr = await flushDocument(db, docName, update, sv)
-      return fr
+      await flushDocument(db, docName, update, sv)
     })
   }
 
@@ -310,7 +367,7 @@ export class LevelDbPersistence {
    * @return {Promise<Y.Doc>}
    */
   getYDoc (docName) {
-    return this.transact(async db => {
+    return this._transact(async db => {
       const updates = await getLevelUpdates(db, docName)
       const ydoc = new Y.Doc()
       ydoc.transact(() => {
@@ -319,7 +376,7 @@ export class LevelDbPersistence {
         }
       })
       if (updates.length > PREFERRED_TRIM_SIZE) {
-        await flushDocument(this, docName, Y.encodeStateAsUpdate(ydoc), Y.encodeStateVector(ydoc))
+        await flushDocument(db, docName, Y.encodeStateAsUpdate(ydoc), Y.encodeStateVector(ydoc))
       }
       return ydoc
     })
@@ -330,13 +387,19 @@ export class LevelDbPersistence {
    * @return {Promise<Uint8Array>}
    */
   getStateVector (docName) {
-    return this.transact(async db => {
+    return this._transact(async db => {
       const { clock, sv } = await readStateVector(db, docName)
-      if (sv !== null && clock === await getCurrentUpdateClock(db, docName)) {
+      let curClock = -1
+      if (sv !== null) {
+        curClock = await getCurrentUpdateClock(db, docName)
+      }
+      if (sv !== null && clock === curClock) {
         return sv
       } else {
         // current state vector is outdated
-        const { sv } = await this.flushDocument(docName)
+        const updates = await getLevelUpdates(db, docName)
+        const { update, sv } = mergeUpdates(updates)
+        await flushDocument(db, docName, update, sv)
         return sv
       }
     })
@@ -348,19 +411,16 @@ export class LevelDbPersistence {
    * @return {Promise<number>} Returns the clock of the stored update
    */
   storeUpdate (docName, update) {
-    return this.transact(db => storeUpdate(db, docName, update))
+    return this._transact(db => storeUpdate(db, docName, update))
   }
 
   /**
    * @param {string} docName
    * @param {Uint8Array} stateVector
    */
-  getDiff (docName, stateVector) {
-    return this.transact(async db => {
-      const ydoc = await this.getYDoc(docName)
-      const update = Y.encodeStateAsUpdate(ydoc, stateVector)
-      return update
-    })
+  async getDiff (docName, stateVector) {
+    const ydoc = await this.getYDoc(docName)
+    return Y.encodeStateAsUpdate(ydoc, stateVector)
   }
 
   /**
@@ -368,7 +428,7 @@ export class LevelDbPersistence {
    * @return {Promise<void>}
    */
   clearDocument (docName) {
-    return this.transact(db => clearRange(db, createDocumentFirstKey(docName), createDocumentLastKey(docName)))
+    return this._transact(db => clearRange(db, createDocumentFirstKey(docName), createDocumentLastKey(docName)))
   }
 
   /**
@@ -378,7 +438,7 @@ export class LevelDbPersistence {
    * @return {Promise<void>}
    */
   setMeta (docName, metaKey, value) {
-    return this.transact(db => levelPut(db, createDocumentMetaKey(docName, metaKey), buffer.encodeAny(value)))
+    return this._transact(db => levelPut(db, createDocumentMetaKey(docName, metaKey), buffer.encodeAny(value)))
   }
 
   /**
@@ -387,7 +447,7 @@ export class LevelDbPersistence {
    * @return {Promise<any>}
    */
   delMeta (docName, metaKey) {
-    return this.transact(db => db.del(createDocumentMetaKey(docName, metaKey)))
+    return this._transact(db => db.del(createDocumentMetaKey(docName, metaKey)))
   }
 
   /**
@@ -396,7 +456,7 @@ export class LevelDbPersistence {
    * @return {Promise<any>}
    */
   getMeta (docName, metaKey) {
-    return this.transact(async db => {
+    return this._transact(async db => {
       const res = await levelGet(db, createDocumentMetaKey(docName, metaKey))
       if (res === null) {
         return// return void
@@ -410,7 +470,7 @@ export class LevelDbPersistence {
    * @return {Promise<Map<string, any>>}
    */
   getMetas (docName) {
-    return this.transact(async db => {
+    return this._transact(async db => {
       const data = await getLevelBulkData(db, {
         gte: createDocumentMetaKey(docName, ''),
         lt: createDocumentMetaEndKey(docName),
@@ -418,7 +478,7 @@ export class LevelDbPersistence {
         values: true
       })
       const metas = new Map()
-      data.forEach(v => { metas.set(v.key, v.value) })
+      data.forEach(v => { metas.set(v.key[3], buffer.decodeAny(v.value)) })
       return metas
     })
   }
@@ -429,6 +489,6 @@ export class LevelDbPersistence {
    * @return {Promise<void>}
    */
   destroy () {
-    return this.transact(db => db.close())
+    return this._transact(db => db.close())
   }
 }

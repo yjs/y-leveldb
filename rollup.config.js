@@ -1,5 +1,6 @@
 import resolve from '@rollup/plugin-node-resolve'
 import commonjs from '@rollup/plugin-commonjs'
+import nodePolyfills from 'rollup-plugin-node-polyfills'
 
 export default [{
   input: './tests/index.js',
@@ -15,6 +16,21 @@ export default [{
     }
   },
   external: id => /^(lib0|yjs)\//.test(id)
+}, {
+  input: './tests/index.js',
+  output: {
+    file: './dist/test.js',
+    format: 'iife',
+    sourcemap: true
+  },
+  plugins: [
+    resolve({
+      mainFields: ['module', 'browser', 'main'],
+      preferBuiltins: false
+    }),
+    commonjs(),
+    nodePolyfills()
+  ]
 }, {
   input: './src/y-leveldb.js',
   output: {
