@@ -1,6 +1,6 @@
 
 import * as Y from 'yjs'
-import { PREFERRED_TRIM_SIZE, LevelDbPersistence, getLevelUpdates, getLevelBulkData } from '../src/y-leveldb.js'
+import { PREFERRED_TRIM_SIZE, LeveldbPersistence, getLevelUpdates, getLevelBulkData } from '../src/y-leveldb.js'
 import * as t from 'lib0/testing.js'
 import * as decoding from 'lib0/decoding.js'
 
@@ -39,7 +39,7 @@ const decodeStateVector = decodedState => readStateVector(decoding.createDecoder
 /**
  * Flushes all updates to ldb and delets items from updates array.
  *
- * @param {LevelDbPersistence} ldb
+ * @param {LeveldbPersistence} ldb
  * @param {string} docName
  * @param {Array<Uint8Array>} updates
  */
@@ -53,7 +53,7 @@ export const testLeveldbUpdateStorage = async tc => {
   const docName = tc.testName
   const ydoc1 = new Y.Doc()
   ydoc1.clientID = 0 // so we can check the state vector
-  const leveldbPersistence = new LevelDbPersistence(storageName)
+  const leveldbPersistence = new LeveldbPersistence(storageName)
   // clear all data, so we can check allData later
   await leveldbPersistence._transact(async db => db.clear())
   t.compareArrays([], await leveldbPersistence.getAllDocNames())
@@ -98,7 +98,7 @@ export const testEncodeManyUpdates = async tc => {
   const docName = tc.testName
   const ydoc1 = new Y.Doc()
   ydoc1.clientID = 0 // so we can check the state vector
-  const leveldbPersistence = new LevelDbPersistence(storageName)
+  const leveldbPersistence = new LeveldbPersistence(storageName)
   await leveldbPersistence.clearDocument(docName)
 
   const updates = []
@@ -149,7 +149,7 @@ export const testDiff = async tc => {
   const docName = tc.testName
   const ydoc1 = new Y.Doc()
   ydoc1.clientID = 0 // so we can check the state vector
-  const leveldbPersistence = new LevelDbPersistence(storageName)
+  const leveldbPersistence = new LeveldbPersistence(storageName)
   await leveldbPersistence.clearDocument(docName)
 
   const updates = []
@@ -188,7 +188,7 @@ export const testDiff = async tc => {
  */
 export const testMetas = async tc => {
   const docName = tc.testName
-  const leveldbPersistence = new LevelDbPersistence(storageName)
+  const leveldbPersistence = new LeveldbPersistence(storageName)
   await leveldbPersistence.clearDocument(docName)
 
   await leveldbPersistence.setMeta(docName, 'a', 4)
@@ -217,7 +217,7 @@ export const testMetas = async tc => {
  */
 export const testDeleteEmptySv = async tc => {
   const docName = tc.testName
-  const leveldbPersistence = new LevelDbPersistence(storageName)
+  const leveldbPersistence = new LeveldbPersistence(storageName)
   await leveldbPersistence.clearAll()
 
   const ydoc = new Y.Doc()
@@ -239,7 +239,7 @@ export const testDeleteEmptySv = async tc => {
 
 export const testMisc = async tc => {
   const docName = tc.testName
-  const leveldbPersistence = new LevelDbPersistence(storageName)
+  const leveldbPersistence = new LeveldbPersistence(storageName)
   await leveldbPersistence.clearDocument(docName)
 
   const sv = await leveldbPersistence.getStateVector('does not exist')

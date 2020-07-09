@@ -345,7 +345,7 @@ const storeUpdate = async (db, docName, update) => {
   return clock + 1
 }
 
-export class LevelDbPersistence {
+export class LeveldbPersistence {
   /**
    * @param {string} location
    * @param {object} [opts]
@@ -487,6 +487,21 @@ export class LevelDbPersistence {
   }
 
   /**
+   * @param {string} docName
+   * @param {string} metaKey
+   * @return {Promise<any>}
+   */
+  getMeta (docName, metaKey) {
+    return this._transact(async db => {
+      const res = await levelGet(db, createDocumentMetaKey(docName, metaKey))
+      if (res === null) {
+        return// return void
+      }
+      return buffer.decodeAny(res)
+    })
+  }
+
+  /**
    * @return {Promise<Array<string>>}
    */
   getAllDocNames () {
@@ -506,21 +521,6 @@ export class LevelDbPersistence {
         const { sv, clock } = decodeLeveldbStateVector(doc.value)
         return { name: doc.key[1], sv, clock }
       })
-    })
-  }
-
-  /**
-   * @param {string} docName
-   * @param {string} metaKey
-   * @return {Promise<any>}
-   */
-  getMeta (docName, metaKey) {
-    return this._transact(async db => {
-      const res = await levelGet(db, createDocumentMetaKey(docName, metaKey))
-      if (res === null) {
-        return// return void
-      }
-      return buffer.decodeAny(res)
     })
   }
 
