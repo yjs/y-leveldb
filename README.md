@@ -13,8 +13,6 @@ Hence this adapter also supports rocksdb, lmdb, and many more..
 
 ## Use it
 
-Install this with bower or npm.
-
 ```sh
 npm install y-leveldb --save
 ```
