@@ -16,7 +16,7 @@
     "test": "rollup -c && nyc --check-coverage --lines 100 --branches 100 --functions 100 --statements 100 node ./dist/test.cjs",
     "dist": "rollup -c",
     "lint": "markdownlint README.md && standard && tsc",
-    "preversion": "npm run lint && npm run test && npm run clean && npm run dist && test -e dist/src/y-leveldb.d.ts && test -e dist/y-leveldb.cjs",
+    "preversion": "npm run lint && npm run test && npm run clean && npm run dist && tsc && test -e dist/src/y-leveldb.d.ts && test -e dist/y-leveldb.cjs",
     "debug": "concurrently 'rollup -wc' 'http-server -o .'"
   },
   "files": [
