@@ -1,6 +1,6 @@
 
 import * as Y from 'yjs'
-import { PREFERRED_TRIM_SIZE, LevelDbPersistence, getLevelUpdates } from '../src/y-leveldb.js'
+import { PREFERRED_TRIM_SIZE, LevelDbPersistence, getLevelUpdates, getLevelBulkData } from '../src/y-leveldb.js'
 import * as t from 'lib0/testing.js'
 import * as decoding from 'lib0/decoding.js'
 
@@ -54,7 +54,10 @@ export const testLeveldbUpdateStorage = async tc => {
   const ydoc1 = new Y.Doc()
   ydoc1.clientID = 0 // so we can check the state vector
   const leveldbPersistence = new LevelDbPersistence(storageName)
-  await leveldbPersistence.clearDocument(docName)
+  // clear all data, so we can check allData later
+  await leveldbPersistence._transact(async db => db.clear())
+  t.compareArrays([], await leveldbPersistence.getAllDocNames())
+
   const updates = []
 
   ydoc1.on('update', update => {
@@ -73,6 +76,16 @@ export const testLeveldbUpdateStorage = async tc => {
 
   const ydoc2 = await leveldbPersistence.getYDoc(docName)
   t.compareArrays(ydoc2.getArray('arr').toArray(), [2, 1])
+
+  const allData = await leveldbPersistence._transact(async db => getLevelBulkData(db, { gte: ['v1'], lt: ['v2'] }))
+  t.assert(allData.length > 0, 'some data exists')
+
+  t.compareArrays([docName], await leveldbPersistence.getAllDocNames())
+  await leveldbPersistence.clearDocument(docName)
+  t.compareArrays([], await leveldbPersistence.getAllDocNames())
+  const allData2 = await leveldbPersistence._transact(async db => getLevelBulkData(db, { gte: ['v1'], lt: ['v2'] }))
+  console.log(allData2)
+  t.assert(allData2.length === 0, 'really deleted all data')
 
   await leveldbPersistence.destroy()
 }
@@ -196,6 +209,31 @@ export const testMetas = async tc => {
   const metasEmpty = await leveldbPersistence.getMetas(docName)
   t.assert(metasEmpty.size === 0)
 
+  await leveldbPersistence.destroy()
+}
+
+/**
+ * @param {t.TestCase} tc
+ */
+export const testDeleteEmptySv = async tc => {
+  const docName = tc.testName
+  const leveldbPersistence = new LevelDbPersistence(storageName)
+  await leveldbPersistence.clearAll()
+
+  const ydoc = new Y.Doc()
+  ydoc.clientID = 0
+  ydoc.getArray('arr').insert(0, [1])
+  const singleUpdate = Y.encodeStateAsUpdate(ydoc)
+
+  t.compareArrays([], await leveldbPersistence.getAllDocNames())
+  await leveldbPersistence.storeUpdate(docName, singleUpdate)
+  t.compareArrays([docName], await leveldbPersistence.getAllDocNames())
+  const docSvs = await leveldbPersistence.getAllDocStateVecors()
+  t.assert(docSvs.length === 1)
+  t.compare([{ name: docName, clock: 0, sv: Y.encodeStateVector(ydoc) }], docSvs)
+
+  await leveldbPersistence.clearDocument(docName)
+  t.compareArrays([], await leveldbPersistence.getAllDocNames())
   await leveldbPersistence.destroy()
 }
 

@@ -38,6 +38,8 @@ export const writeUint32BigEndian = (encoder, num) => {
  * Read 4 bytes as unsigned integer in big endian order.
  * (most significant byte first)
  *
+ * @todo use lib0/decoding instead
+ *
  * @function
  * @param {decoding.Decoder} decoder
  * @return {number} An unsigned integer.
@@ -160,6 +162,21 @@ export const getLevelUpdates = (db, docName, opts = { values: true, keys: false 
 })
 
 /**
+ * Get all document updates for a specific document.
+ *
+ * @param {any} db
+ * @param {boolean} values
+ * @param {boolean} keys
+ * @return {Promise<Array<any>>}
+ */
+export const getAllDocs = (db, values, keys) => getLevelBulkData(db, {
+  gte: ['v1_sv'],
+  lt: ['v1_sw'],
+  keys,
+  values
+})
+
+/**
  * @param {any} db
  * @param {string} docName
  * @return {Promise<number>} Returns -1 if this document doesn't exist yet
@@ -220,9 +237,10 @@ const createDocumentMetaKey = (docName, metaKey) => ['v1', docName, 'meta', meta
 const createDocumentMetaEndKey = (docName) => ['v1', docName, 'metb'] // simple trick
 
 /**
+ * We have a separate state vector key so we can iterate efficiently over all documents
  * @param {string} docName
  */
-const createDocumentStateVectorKey = (docName) => ['v1', docName, 'sv']
+const createDocumentStateVectorKey = (docName) => ['v1_sv', docName]
 
 /**
  * @param {string} docName
@@ -271,6 +289,17 @@ const writeStateVector = async (db, docName, sv, clock) => {
 }
 
 /**
+ * @param {Uint8Array} buf
+ * @return {{ sv: Uint8Array, clock: number }}
+ */
+const decodeLeveldbStateVector = buf => {
+  const decoder = decoding.createDecoder(buf)
+  const clock = decoding.readVarUint(decoder)
+  const sv = decoding.readVarUint8Array(decoder)
+  return { sv, clock }
+}
+
+/**
  * @param {any} db
  * @param {string} docName
  */
@@ -280,10 +309,7 @@ const readStateVector = async (db, docName) => {
     // no state vector created yet or no document exists
     return { sv: null, clock: -1 }
   }
-  const decoder = decoding.createDecoder(buf)
-  const clock = decoding.readVarUint(decoder)
-  const sv = decoding.readVarUint8Array(decoder)
-  return { sv, clock }
+  return decodeLeveldbStateVector(buf)
 }
 
 /**
@@ -308,6 +334,13 @@ const flushDocument = async (db, docName, stateAsUpdate, stateVector) => {
  */
 const storeUpdate = async (db, docName, update) => {
   const clock = await getCurrentUpdateClock(db, docName)
+  if (clock === -1) {
+    // make sure that a state vector is aways written, so we can search for available documents
+    const ydoc = new Y.Doc()
+    Y.applyUpdate(ydoc, update)
+    const sv = Y.encodeStateVector(ydoc)
+    await writeStateVector(db, docName, sv, 0)
+  }
   await levelPut(db, createDocumentUpdateKey(docName, clock + 1), update)
   return clock + 1
 }
@@ -428,7 +461,10 @@ export class LevelDbPersistence {
    * @return {Promise<void>}
    */
   clearDocument (docName) {
-    return this._transact(db => clearRange(db, createDocumentFirstKey(docName), createDocumentLastKey(docName)))
+    return this._transact(async db => {
+      await db.del(createDocumentStateVectorKey(docName))
+      await clearRange(db, createDocumentFirstKey(docName), createDocumentLastKey(docName))
+    })
   }
 
   /**
@@ -448,6 +484,29 @@ export class LevelDbPersistence {
    */
   delMeta (docName, metaKey) {
     return this._transact(db => db.del(createDocumentMetaKey(docName, metaKey)))
+  }
+
+  /**
+   * @return {Promise<Array<string>>}
+   */
+  getAllDocNames () {
+    return this._transact(async db => {
+      const docKeys = await getAllDocs(db, false, true)
+      return docKeys.map(key => key[1])
+    })
+  }
+
+  /**
+   * @return {Promise<Array<{ name: string, sv: Uint8Array, clock: number }>>}
+   */
+  getAllDocStateVecors () {
+    return this._transact(async db => {
+      const docs = /** @type {any} */ (await getAllDocs(db, true, true))
+      return docs.map(doc => {
+        const { sv, clock } = decodeLeveldbStateVector(doc.value)
+        return { name: doc.key[1], sv, clock }
+      })
+    })
   }
 
   /**
@@ -490,5 +549,12 @@ export class LevelDbPersistence {
    */
   destroy () {
     return this._transact(db => db.close())
+  }
+
+  /**
+   * Delete all data in database.
+   */
+  clearAll () {
+    return this._transact(async db => db.clear())
   }
 }
