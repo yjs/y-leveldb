@@ -30,6 +30,13 @@
       "/docs"
     ]
   },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": "./src/y-leveldb.js",
+      "require": "./dist/y-leveldb.cjs"
+    }
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yjs/y-leveldb.git"
