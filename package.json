@@ -1,6 +1,6 @@
 {
   "name": "y-leveldb",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "LevelDb database adapter for Yjs",
   "type": "module",
   "main": "./dist/y-leveldb.cjs",
