@@ -514,7 +514,7 @@ export class LeveldbPersistence {
   /**
    * @return {Promise<Array<{ name: string, sv: Uint8Array, clock: number }>>}
    */
-  getAllDocStateVecors () {
+  getAllDocStateVectors () {
     return this._transact(async db => {
       const docs = /** @type {any} */ (await getAllDocs(db, true, true))
       return docs.map(doc => {
