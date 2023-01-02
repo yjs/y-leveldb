@@ -18,6 +18,7 @@ npm install y-leveldb --save
 ```
 
 ```js
+import * as Y from 'yjs'
 import { LeveldbPersistence } from 'y-leveldb'
 
 const persistence = new LeveldbPersistence('./storage-location')
@@ -31,7 +32,8 @@ persistence.storeUpdate('my-doc', Y.encodeStateAsUpdate(ydoc))
 
 // when you want to sync, or store data to a database,
 // retrieve the temporary Y.Doc to consume data
-persistence.getYDoc('my-doc').getArray('arr') // [1, 2, 3]
+const ydocPersisted = await persistence.getYDoc('my-doc')
+ydocPersisted.getArray('arr') // [1, 2, 3]
 ```
 
 ## API
