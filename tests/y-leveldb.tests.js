@@ -228,7 +228,7 @@ export const testDeleteEmptySv = async tc => {
   t.compareArrays([], await leveldbPersistence.getAllDocNames())
   await leveldbPersistence.storeUpdate(docName, singleUpdate)
   t.compareArrays([docName], await leveldbPersistence.getAllDocNames())
-  const docSvs = await leveldbPersistence.getAllDocStateVecors()
+  const docSvs = await leveldbPersistence.getAllDocStateVectors()
   t.assert(docSvs.length === 1)
   t.compare([{ name: docName, clock: 0, sv: Y.encodeStateVector(ydoc) }], docSvs)
 
