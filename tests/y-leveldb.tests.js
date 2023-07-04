@@ -55,7 +55,7 @@ export const testLeveldbUpdateStorage = async tc => {
   ydoc1.clientID = 0 // so we can check the state vector
   const leveldbPersistence = new LeveldbPersistence(storageName)
   // clear all data, so we can check allData later
-  await leveldbPersistence._transact(async db => db.clear())
+  await leveldbPersistence._transact(null, async db => db.clear())
   t.compareArrays([], await leveldbPersistence.getAllDocNames())
 
   const updates = []
@@ -77,13 +77,13 @@ export const testLeveldbUpdateStorage = async tc => {
   const ydoc2 = await leveldbPersistence.getYDoc(docName)
   t.compareArrays(ydoc2.getArray('arr').toArray(), [2, 1])
 
-  const allData = await leveldbPersistence._transact(async db => getLevelBulkData(db, { gte: ['v1'], lt: ['v2'] }))
+  const allData = await leveldbPersistence._transact(docName, async db => getLevelBulkData(db, { gte: ['v1'], lt: ['v2'] }))
   t.assert(allData.length > 0, 'some data exists')
 
   t.compareArrays([docName], await leveldbPersistence.getAllDocNames())
   await leveldbPersistence.clearDocument(docName)
   t.compareArrays([], await leveldbPersistence.getAllDocNames())
-  const allData2 = await leveldbPersistence._transact(async db => getLevelBulkData(db, { gte: ['v1'], lt: ['v2'] }))
+  const allData2 = await leveldbPersistence._transact(docName, async db => getLevelBulkData(db, { gte: ['v1'], lt: ['v2'] }))
   console.log(allData2)
   t.assert(allData2.length === 0, 'really deleted all data')
 
@@ -108,7 +108,7 @@ export const testEncodeManyUpdates = async tc => {
   })
   await flushUpdatesHelper(leveldbPersistence, docName, updates)
 
-  const keys = await leveldbPersistence._transact(db => getLevelUpdates(db, docName, { keys: true, values: false }))
+  const keys = await leveldbPersistence._transact(docName, db => getLevelUpdates(db, docName, { keys: true, values: false }))
 
   for (let i = 0; i < keys.length; i++) {
     t.assert(keys[i][3] === i)
@@ -124,7 +124,7 @@ export const testEncodeManyUpdates = async tc => {
   t.assert(ydoc2.getArray('arr').length === N)
 
   await leveldbPersistence.flushDocument(docName)
-  const mergedKeys = await leveldbPersistence._transact(db => getLevelUpdates(db, docName, { keys: true, values: false }))
+  const mergedKeys = await leveldbPersistence._transact(docName, db => getLevelUpdates(db, docName, { keys: true, values: false }))
   t.assert(mergedKeys.length === 1)
 
   // getYDoc still works after flush/merge
