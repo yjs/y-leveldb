@@ -354,7 +354,13 @@ export class LeveldbPersistence {
    */
   constructor (location, /* istanbul ignore next */ { level = defaultLevel, levelOptions = {} } = {}) {
     const db = level(location, { ...levelOptions, valueEncoding, keyEncoding })
+
+    // global lock
+    this.trAll = promise.resolve()
+
+    // per-doc locks
     this.tr = new Map()
+
     /**
      * Execute an transaction on a database. This will ensure that other processes are currently not writing.
      *
@@ -363,15 +369,17 @@ export class LeveldbPersistence {
      * @template T
      *
      * @param {function(any):Promise<T>} f A transaction that receives the db object
-     * @param {string | null} docName Blocks transactions to the same docName. If null, blocks other transactions to null.
+     * @param {string | null} docName Blocks transactions to the same docName. If null, blocks all transactions.
      * @return {Promise<T>}
      */
     this._transact = (docName, f) => {
       const mutexKey = docName || ''
+      const currTrAll = this.trAll
       const currTr = this.tr.get(mutexKey)
       let res = /** @type {any} */ (null)
       let tr = promise.resolve()
       tr = (async () => {
+        await currTrAll
         await currTr
         try {
           res = await f(db)
@@ -387,7 +395,11 @@ export class LeveldbPersistence {
         }
       })()
 
-      this.tr.set(mutexKey, tr)
+      if (docName === null) {
+        this.trAll = Promise.all([...this.tr.values()]).then(() => tr).then(() => res)
+      } else {
+        this.tr.set(mutexKey, tr)
+      }
 
       return tr.then(() => res)
     }
