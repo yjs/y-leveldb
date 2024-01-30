@@ -53,7 +53,7 @@ const persistence = new LeveldbPersistence('./storage-location', { level })
 
 #### `persistence.getYDoc(docName: string): Promise<Y.Doc>`
 
-Create a Y.Doc instance with the data persistet in leveldb. Use this to
+Create a Y.Doc instance with the data persisted in leveldb. Use this to
 temporarily create a Yjs document to sync changes or extract data.
 
 #### `persistence.storeUpdate(docName: string, update: Uint8Array): Promise`
