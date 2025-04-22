@@ -1,17 +1,21 @@
 {
   "compilerOptions": {
-    "target": "es2018",
-    "lib": ["es2018", "dom"],
+    "target": "ES2021",
+    "lib": ["ES2021", "dom"],
+    "module": "node16",
     "allowJs": true,
     "checkJs": true,
     "declaration": true,
     "declarationMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "rootDir": "./",
     "emitDeclarationOnly": true,
     "strict": true,
-    "noImplicitAny": false,
-    "moduleResolution": "node",
-    "outDir": "./dist"
+    "noImplicitAny": true,
+    "moduleResolution": "nodenext",
+    "paths": { }
   },
-  "include": ["./src/**/*", "./tests/**/*"],
-  "exclude": ["../lib0/**/*", "node_modules/**/*", "dist", "dist/**/*.js"]
+  "include": ["./src/**/*.js"],
+  "exclude": []
 }

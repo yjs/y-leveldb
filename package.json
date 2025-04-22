@@ -73,7 +73,7 @@
     "rollup": "^2.20.0",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "standard": "^14.3.4",
-    "typescript": "^3.9.6",
+    "typescript": "^5.8.3",
     "y-protocols": "^1.0.0",
     "yjs": "^13.2.0"
   },
