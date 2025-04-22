@@ -4,8 +4,8 @@ import * as decoding from 'lib0/decoding.js'
 import * as binary from 'lib0/binary.js'
 import * as promise from 'lib0/promise.js'
 import * as buffer from 'lib0/buffer.js'
-// @ts-ignore
-import defaultLevel from 'level'
+import { Level } from 'level'
+import { EntryStream, KeyStream, ValueStream } from 'level-read-stream';
 import { Buffer } from 'buffer'
 
 export const PREFERRED_TRIM_SIZE = 500
@@ -133,18 +133,31 @@ const levelPut = async (db, key, val) => db.put(key, Buffer.from(val))
  * @param {object} opts
  * @return {Promise<Array<any>>}
  */
-export const getLevelBulkData = (db, opts) => promise.create((resolve, reject) => {
+export const getLevelBulkData = (db, { keys, values, ...opts }) => promise.create((resolve, reject) => {
   /**
    * @type {Array<any>} result
    */
   const result = []
-  db.createReadStream(
-    opts
-  ).on('data', /** @param {any} data */ data =>
-    result.push(data)
-  ).on('end', () =>
-    resolve(result)
-  ).on('error', reject)
+
+  if (keys && values) {
+    new EntryStream(db, opts).on('data', data => {
+      result.push(data)
+    }).on('end', () => {
+      resolve(result)
+    }).on('error', reject)
+  } else if (keys) {
+    new KeyStream(db, opts).on('data', data => {
+      result.push(data)
+    }).on('end', () => {
+      resolve(result)
+    }).on('error', reject)
+  } else {
+    new ValueStream(db, opts).on('data', data => {
+      result.push(data)
+    }).on('end', () => {
+      resolve(result)
+    }).on('error', reject)
+  }
 })
 
 /**
@@ -352,8 +365,8 @@ export class LeveldbPersistence {
    * @param {any} [opts.level] Level-compatible adapter. E.g. leveldown, level-rem, level-indexeddb. Defaults to `level`
    * @param {object} [opts.levelOptions] Options that are passed down to the level instance
    */
-  constructor (location, /* istanbul ignore next */ { level = defaultLevel, levelOptions = {} } = {}) {
-    const db = level(location, { ...levelOptions, valueEncoding, keyEncoding })
+  constructor (location, /* istanbul ignore next */ { level = Level, levelOptions = {} } = {}) {
+    const db = new level(location, { ...levelOptions, valueEncoding, keyEncoding })
     this.tr = promise.resolve()
     /**
      * Execute an transaction on a database. This will ensure that other processes are currently not writing.

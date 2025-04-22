@@ -56,12 +56,14 @@
   },
   "homepage": "https://yjs.dev",
   "dependencies": {
-    "level": "^6.0.1",
+    "level": "^8.0.1",
+    "level-read-stream": "^2.0.0",
     "lib0": "^0.2.31"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^13.0.0",
     "@rollup/plugin-node-resolve": "^8.1.0",
+    "@types/readable-stream": "^4.0.18",
     "concurrently": "^3.6.1",
     "http-server": "^0.12.3",
     "jsdoc": "^3.6.3",
