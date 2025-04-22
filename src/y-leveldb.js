@@ -4,8 +4,8 @@ import * as decoding from 'lib0/decoding.js'
 import * as binary from 'lib0/binary.js'
 import * as promise from 'lib0/promise.js'
 import * as buffer from 'lib0/buffer.js'
-import { Level } from 'level'
-import { EntryStream, KeyStream, ValueStream } from 'level-read-stream';
+import { Level as DefaultLevel } from 'level'
+import { EntryStream, KeyStream, ValueStream } from 'level-read-stream'
 import { Buffer } from 'buffer'
 
 export const PREFERRED_TRIM_SIZE = 500
@@ -362,11 +362,11 @@ export class LeveldbPersistence {
   /**
    * @param {string} location
    * @param {object} [opts]
-   * @param {any} [opts.level] Level-compatible adapter. E.g. leveldown, level-rem, level-indexeddb. Defaults to `level`
+   * @param {any} [opts.Level] Level-compatible adapter. E.g. leveldown, level-rem, level-indexeddb. Defaults to `level`
    * @param {object} [opts.levelOptions] Options that are passed down to the level instance
    */
-  constructor (location, /* istanbul ignore next */ { level = Level, levelOptions = {} } = {}) {
-    const db = new level(location, { ...levelOptions, valueEncoding, keyEncoding })
+  constructor (location, /* istanbul ignore next */ { Level = DefaultLevel, levelOptions = {} } = {}) {
+    const db = new Level(location, { ...levelOptions, valueEncoding, keyEncoding })
     this.tr = promise.resolve()
     /**
      * Execute an transaction on a database. This will ensure that other processes are currently not writing.

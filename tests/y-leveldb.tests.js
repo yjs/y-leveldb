@@ -1,4 +1,3 @@
-
 import * as Y from 'yjs'
 import { PREFERRED_TRIM_SIZE, LeveldbPersistence, getLevelUpdates, getLevelBulkData } from '../src/y-leveldb.js'
 import * as t from 'lib0/testing.js'
