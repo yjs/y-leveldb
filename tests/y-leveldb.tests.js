@@ -1,5 +1,5 @@
 import * as Y from 'yjs'
-import { PREFERRED_TRIM_SIZE, LeveldbPersistence, getLevelUpdates, getLevelBulkData } from '../src/y-leveldb.js'
+import { PREFERRED_TRIM_SIZE, LeveldbPersistence, getLevelBulkEntries, getLevelUpdatesEntries } from '../src/y-leveldb.js'
 import * as t from 'lib0/testing.js'
 import * as decoding from 'lib0/decoding.js'
 
@@ -57,6 +57,9 @@ export const testLeveldbUpdateStorage = async tc => {
   await leveldbPersistence._transact(async db => db.clear())
   t.compareArrays([], await leveldbPersistence.getAllDocNames())
 
+  /**
+   * @type {Array<Uint8Array>}
+   */
   const updates = []
 
   ydoc1.on('update', update => {
@@ -76,13 +79,13 @@ export const testLeveldbUpdateStorage = async tc => {
   const ydoc2 = await leveldbPersistence.getYDoc(docName)
   t.compareArrays(ydoc2.getArray('arr').toArray(), [2, 1])
 
-  const allData = await leveldbPersistence._transact(async db => getLevelBulkData(db, { gte: ['v1'], lt: ['v2'] }))
+  const allData = await leveldbPersistence._transact(async db => getLevelBulkEntries(db, { gte: ['v1'], lt: ['v2'] }))
   t.assert(allData.length > 0, 'some data exists')
 
   t.compareArrays([docName], await leveldbPersistence.getAllDocNames())
   await leveldbPersistence.clearDocument(docName)
   t.compareArrays([], await leveldbPersistence.getAllDocNames())
-  const allData2 = await leveldbPersistence._transact(async db => getLevelBulkData(db, { gte: ['v1'], lt: ['v2'] }))
+  const allData2 = await leveldbPersistence._transact(async db => getLevelBulkEntries(db, { gte: ['v1'], lt: ['v2'] }))
   console.log(allData2)
   t.assert(allData2.length === 0, 'really deleted all data')
 
@@ -100,6 +103,9 @@ export const testEncodeManyUpdates = async tc => {
   const leveldbPersistence = new LeveldbPersistence(storageName)
   await leveldbPersistence.clearDocument(docName)
 
+  /**
+   * @type {Array<Uint8Array>}
+   */
   const updates = []
 
   ydoc1.on('update', update => {
@@ -107,10 +113,10 @@ export const testEncodeManyUpdates = async tc => {
   })
   await flushUpdatesHelper(leveldbPersistence, docName, updates)
 
-  const keys = await leveldbPersistence._transact(db => getLevelUpdates(db, docName, { keys: true, values: false }))
+  const keys = await leveldbPersistence._transact(db => getLevelUpdatesEntries(db, docName))
 
   for (let i = 0; i < keys.length; i++) {
-    t.assert(keys[i][3] === i)
+    t.assert(keys[i].key[3] === i)
   }
 
   const yarray = ydoc1.getArray('arr')
@@ -123,7 +129,7 @@ export const testEncodeManyUpdates = async tc => {
   t.assert(ydoc2.getArray('arr').length === N)
 
   await leveldbPersistence.flushDocument(docName)
-  const mergedKeys = await leveldbPersistence._transact(db => getLevelUpdates(db, docName, { keys: true, values: false }))
+  const mergedKeys = await leveldbPersistence._transact(db => getLevelUpdatesEntries(db, docName))
   t.assert(mergedKeys.length === 1)
 
   // getYDoc still works after flush/merge
@@ -151,6 +157,9 @@ export const testDiff = async tc => {
   const leveldbPersistence = new LeveldbPersistence(storageName)
   await leveldbPersistence.clearDocument(docName)
 
+  /**
+   * @type {Array<Uint8Array>}
+   */
   const updates = []
   ydoc1.on('update', update => {
     updates.push(update)
@@ -236,6 +245,9 @@ export const testDeleteEmptySv = async tc => {
   await leveldbPersistence.destroy()
 }
 
+/**
+ * @param {t.TestCase} tc
+ */
 export const testMisc = async tc => {
   const docName = tc.testName
   const leveldbPersistence = new LeveldbPersistence(storageName)

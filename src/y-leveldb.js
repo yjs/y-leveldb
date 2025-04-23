@@ -17,7 +17,7 @@ const YEncodingUint32 = 1
  * @typedef {import('abstract-level').AbstractLevel<any, Array<String|number>, Uint8Array>} AbstractLevel
  */
 /**
- * @typedef {Array<string|number>} DocKey
+ * @typedef {['v1', string, 'update', number] | ['v1', string, 'meta', string] | ['v1_sv', number]} DocKey
  */
 
 const valueEncoding = {
@@ -138,7 +138,7 @@ const levelPut = async (db, key, val) => db.put(key, Buffer.from(val))
  * A "bulkier" implementation of level streams. Returns the result in one flush.
  *
  * @param {AbstractLevel} db
- * @param {import('abstract-level').AbstractIteratorOptions<DocKey, Uint8Array>} opts
+ * @param {import('abstract-level').AbstractIteratorOptions<any, Uint8Array>} opts
  * @return {Promise<Array<{ key: DocKey, value: Uint8Array }>>}
  */
 export const getLevelBulkEntries = (db, opts) => promise.create((resolve, reject) => {
@@ -157,7 +157,7 @@ export const getLevelBulkEntries = (db, opts) => promise.create((resolve, reject
  * A "bulkier" implementation of level streams. Returns the result in one flush.
  *
  * @param {AbstractLevel} db
- * @param {import('abstract-level').AbstractIteratorOptions<DocKey, Uint8Array>} opts
+ * @param {import('abstract-level').AbstractIteratorOptions<any, Uint8Array>} opts
  * @return {Promise<Array<DocKey>>}
  */
 export const getLevelBulkKeys = (db, opts) => promise.create((resolve, reject) => {
@@ -199,7 +199,36 @@ export const getLevelBulkValues = (db, opts) => promise.create((resolve, reject)
  * @param {any} [opts]
  * @return {Promise<Array<Uint8Array>>}
  */
-export const getLevelUpdates = (db, docName, opts = { values: true, keys: false }) => getLevelBulkValues(db, {
+export const getLevelUpdates = (db, docName, opts = {}) => getLevelBulkValues(db, {
+  gte: createDocumentUpdateKey(docName, 0),
+  lt: createDocumentUpdateKey(docName, binary.BITS32),
+  ...opts
+})
+
+/**
+ * Get all document updates for a specific document.
+ *
+ * @param {any} db
+ * @param {string} docName
+ * @param {any} [opts]
+ * @return {Promise<Array<{key: DocKey, value: Uint8Array }>>}
+ */
+export const getLevelUpdatesEntries = (db, docName, opts = {}) => getLevelBulkEntries(db, {
+  gte: createDocumentUpdateKey(docName, 0),
+  lt: createDocumentUpdateKey(docName, binary.BITS32),
+  ...opts
+})
+
+/**
+ * Get all document updates for a specific document.
+ *
+ * @param {any} db
+ * @param {string} docName
+ * @param {any} opts
+ * @return {Promise<Array<DocKey>>}
+ */
+/* istanbul ignore next */
+export const getLevelUpdatesKeys = (db, docName, opts = {}) => getLevelBulkKeys(db, {
   gte: createDocumentUpdateKey(docName, 0),
   lt: createDocumentUpdateKey(docName, binary.BITS32),
   ...opts
@@ -230,11 +259,11 @@ export const getAllDocs = (db) => getLevelBulkEntries(db, {
  * @param {string} docName
  * @return {Promise<number>} Returns -1 if this document doesn't exist yet
  */
-export const getCurrentUpdateClock = (db, docName) => getLevelUpdates(db, docName, { keys: true, values: false, reverse: true, limit: 1 }).then(keys => {
-  if (keys.length === 0) {
+export const getCurrentUpdateClock = (db, docName) => getLevelUpdatesKeys(db, docName, { reverse: true, limit: 1 }).then(entries => {
+  if (entries.length === 0) {
     return -1
   } else {
-    return keys[0][3]
+    return /** @type {number} */ (entries[0][3])
   }
 })
 
@@ -270,18 +299,20 @@ const clearUpdatesRange = async (db, docName, from, to) => clearRange(db, create
  *
  * @param {string} docName
  * @param {number} clock must be unique
- * @return {Array<string|number>}
+ * @return {DocKey}
  */
 const createDocumentUpdateKey = (docName, clock) => ['v1', docName, 'update', clock]
 
 /**
  * @param {string} docName
  * @param {string} metaKey
+ * @return {any}
  */
 const createDocumentMetaKey = (docName, metaKey) => ['v1', docName, 'meta', metaKey]
 
 /**
  * @param {string} docName
+ * @return {any}
  */
 const createDocumentMetaEndKey = (docName) => ['v1', docName, 'metb'] // simple trick
 

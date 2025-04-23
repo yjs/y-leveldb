@@ -17,6 +17,6 @@
     "skipLibCheck": true,
     "paths": { }
   },
-  "include": ["./src/**/*.js"],
+  "include": ["./src/**/*.js", "./tests/**/*.js"],
   "exclude": []
 }
