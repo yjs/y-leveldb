@@ -63,11 +63,11 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^13.0.0",
     "@rollup/plugin-node-resolve": "^8.1.0",
+    "@types/node": "^22.14.1",
     "@types/readable-stream": "^4.0.18",
     "concurrently": "^3.6.1",
     "http-server": "^0.12.3",
     "jsdoc": "^3.6.3",
-    "level-mem": "^5.0.1",
     "markdownlint-cli": "^0.23.2",
     "nyc": "^15.1.0",
     "rollup": "^2.20.0",

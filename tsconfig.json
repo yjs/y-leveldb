@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2021",
-    "lib": ["ES2021", "dom"],
+    "target": "ESNext",
+    "lib": ["ESNext", "dom"],
     "module": "node16",
     "allowJs": true,
     "checkJs": true,
@@ -14,6 +14,7 @@
     "strict": true,
     "noImplicitAny": true,
     "moduleResolution": "nodenext",
+    "skipLibCheck": true,
     "paths": { }
   },
   "include": ["./src/**/*.js"],

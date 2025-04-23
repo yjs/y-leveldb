@@ -13,6 +13,13 @@ export const PREFERRED_TRIM_SIZE = 500
 const YEncodingString = 0
 const YEncodingUint32 = 1
 
+/**
+ * @typedef {import('abstract-level').AbstractLevel<any, Array<String|number>, Uint8Array>} AbstractLevel
+ */
+/**
+ * @typedef {Array<string|number>} DocKey
+ */
+
 const valueEncoding = {
   buffer: true,
   type: 'y-value',
@@ -96,8 +103,9 @@ export const keyEncoding = {
  *
  * This helper method for level returns `null` instead if the key is not found.
  *
- * @param {any} db
+ * @param {AbstractLevel} db
  * @param {any} key
+ * @return {Promise<Uint8Array | undefined>}
  */
 const levelGet = async (db, key) => {
   let res
@@ -105,8 +113,8 @@ const levelGet = async (db, key) => {
     res = await db.get(key)
   } catch (err) {
     /* istanbul ignore else */
-    if (err.notFound) {
-      return null
+    if (/** @type {any} */ (err).notFound) {
+      return
     } else {
       throw err
     }
@@ -129,35 +137,58 @@ const levelPut = async (db, key, val) => db.put(key, Buffer.from(val))
 /**
  * A "bulkier" implementation of level streams. Returns the result in one flush.
  *
- * @param {any} db
- * @param {object} opts
- * @return {Promise<Array<any>>}
+ * @param {AbstractLevel} db
+ * @param {import('abstract-level').AbstractIteratorOptions<DocKey, Uint8Array>} opts
+ * @return {Promise<Array<{ key: DocKey, value: Uint8Array }>>}
  */
-export const getLevelBulkData = (db, { keys, values, ...opts }) => promise.create((resolve, reject) => {
+export const getLevelBulkEntries = (db, opts) => promise.create((resolve, reject) => {
   /**
    * @type {Array<any>} result
    */
   const result = []
+  new EntryStream(db, opts).on('data', data => {
+    result.push(data)
+  }).on('end', () => {
+    resolve(result)
+  }).on('error', reject)
+})
 
-  if (keys && values) {
-    new EntryStream(db, opts).on('data', data => {
-      result.push(data)
-    }).on('end', () => {
-      resolve(result)
-    }).on('error', reject)
-  } else if (keys) {
-    new KeyStream(db, opts).on('data', data => {
-      result.push(data)
-    }).on('end', () => {
-      resolve(result)
-    }).on('error', reject)
-  } else {
-    new ValueStream(db, opts).on('data', data => {
-      result.push(data)
-    }).on('end', () => {
-      resolve(result)
-    }).on('error', reject)
-  }
+/**
+ * A "bulkier" implementation of level streams. Returns the result in one flush.
+ *
+ * @param {AbstractLevel} db
+ * @param {import('abstract-level').AbstractIteratorOptions<DocKey, Uint8Array>} opts
+ * @return {Promise<Array<DocKey>>}
+ */
+export const getLevelBulkKeys = (db, opts) => promise.create((resolve, reject) => {
+  /**
+   * @type {Array<any>} result
+   */
+  const result = []
+  new KeyStream(db, opts).on('data', data => {
+    result.push(data)
+  }).on('end', () => {
+    resolve(result)
+  }).on('error', reject)
+})
+
+/**
+ * A "bulkier" implementation of level streams. Returns the result in one flush.
+ *
+ * @param {AbstractLevel} db
+ * @param {import('abstract-level').AbstractIteratorOptions<DocKey, Uint8Array>} opts
+ * @return {Promise<Array<Uint8Array>>}
+ */
+export const getLevelBulkValues = (db, opts) => promise.create((resolve, reject) => {
+  /**
+   * @type {Array<any>} result
+   */
+  const result = []
+  new ValueStream(db, opts).on('data', data => {
+    result.push(data)
+  }).on('end', () => {
+    resolve(result)
+  }).on('error', reject)
 })
 
 /**
@@ -166,9 +197,9 @@ export const getLevelBulkData = (db, { keys, values, ...opts }) => promise.creat
  * @param {any} db
  * @param {string} docName
  * @param {any} [opts]
- * @return {Promise<Array<Buffer>>}
+ * @return {Promise<Array<Uint8Array>>}
  */
-export const getLevelUpdates = (db, docName, opts = { values: true, keys: false }) => getLevelBulkData(db, {
+export const getLevelUpdates = (db, docName, opts = { values: true, keys: false }) => getLevelBulkValues(db, {
   gte: createDocumentUpdateKey(docName, 0),
   lt: createDocumentUpdateKey(docName, binary.BITS32),
   ...opts
@@ -177,16 +208,21 @@ export const getLevelUpdates = (db, docName, opts = { values: true, keys: false 
 /**
  * Get all document updates for a specific document.
  *
- * @param {any} db
- * @param {boolean} values
- * @param {boolean} keys
- * @return {Promise<Array<any>>}
+ * @param {AbstractLevel} db
  */
-export const getAllDocs = (db, values, keys) => getLevelBulkData(db, {
+export const getAllDocsKeys = (db) => getLevelBulkKeys(db, {
   gte: ['v1_sv'],
-  lt: ['v1_sw'],
-  keys,
-  values
+  lt: ['v1_sw']
+})
+
+/**
+ * Get all document updates for a specific document.
+ *
+ * @param {AbstractLevel} db
+ */
+export const getAllDocs = (db) => getLevelBulkEntries(db, {
+  gte: ['v1_sv'],
+  lt: ['v1_sw']
 })
 
 /**
@@ -213,7 +249,7 @@ const clearRange = async (db, gte, lt) => {
   if (db.supports.clear) {
     await db.clear({ gte, lt })
   } else {
-    const keys = await getLevelBulkData(db, { values: false, keys: true, gte, lt })
+    const keys = await getLevelBulkKeys(db, { gte, lt })
     const ops = keys.map(key => ({ type: 'del', key }))
     await db.batch(ops)
   }
@@ -318,7 +354,7 @@ const decodeLeveldbStateVector = buf => {
  */
 const readStateVector = async (db, docName) => {
   const buf = await levelGet(db, createDocumentStateVectorKey(docName))
-  if (buf === null) {
+  if (buf == null) {
     // no state vector created yet or no document exists
     return { sv: null, clock: -1 }
   }
@@ -361,11 +397,14 @@ const storeUpdate = async (db, docName, update) => {
 export class LeveldbPersistence {
   /**
    * @param {string} location
-   * @param {object} [opts]
+   * @param {object} opts
    * @param {any} [opts.Level] Level-compatible adapter. E.g. leveldown, level-rem, level-indexeddb. Defaults to `level`
    * @param {object} [opts.levelOptions] Options that are passed down to the level instance
    */
   constructor (location, /* istanbul ignore next */ { Level = DefaultLevel, levelOptions = {} } = {}) {
+    /**
+     * @type {import('abstract-level').AbstractLevel<any>}
+     */
     const db = new Level(location, { ...levelOptions, valueEncoding, keyEncoding })
     this.tr = promise.resolve()
     /**
@@ -507,8 +546,8 @@ export class LeveldbPersistence {
   getMeta (docName, metaKey) {
     return this._transact(async db => {
       const res = await levelGet(db, createDocumentMetaKey(docName, metaKey))
-      if (res === null) {
-        return// return void
+      if (res == null) {
+        return
       }
       return buffer.decodeAny(res)
     })
@@ -519,8 +558,8 @@ export class LeveldbPersistence {
    */
   getAllDocNames () {
     return this._transact(async db => {
-      const docKeys = await getAllDocs(db, false, true)
-      return docKeys.map(key => key[1])
+      const docKeys = await getAllDocsKeys(db)
+      return docKeys.map(key => /** @type {string} */ (key[1]))
     })
   }
 
@@ -529,10 +568,10 @@ export class LeveldbPersistence {
    */
   getAllDocStateVectors () {
     return this._transact(async db => {
-      const docs = /** @type {any} */ (await getAllDocs(db, true, true))
+      const docs = await getAllDocs(db)
       return docs.map(doc => {
         const { sv, clock } = decodeLeveldbStateVector(doc.value)
-        return { name: doc.key[1], sv, clock }
+        return { name: /** @type {string} */ (doc.key[1]), sv, clock }
       })
     })
   }
@@ -543,7 +582,7 @@ export class LeveldbPersistence {
    */
   getMetas (docName) {
     return this._transact(async db => {
-      const data = await getLevelBulkData(db, {
+      const data = await getLevelBulkEntries(db, {
         gte: createDocumentMetaKey(docName, ''),
         lt: createDocumentMetaEndKey(docName),
         keys: true,
