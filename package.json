@@ -33,8 +33,11 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
+      "types": "./dist/src/y-leveldb.d.ts",
+      "module": "./src/y-leveldb.js",
       "import": "./src/y-leveldb.js",
-      "require": "./dist/y-leveldb.cjs"
+      "require": "./dist/y-leveldb.cjs",
+      "default": "./src/y-leveldb.js"
     }
   },
   "repository": {
