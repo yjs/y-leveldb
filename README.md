@@ -1,5 +1,7 @@
 # LevelDB database adapter for [Yjs](https://github.com/yjs/yjs)
 
+> deprecated
+
 LevelDB is a fast embedded database. It is the underlying technology of IndexedDB.
 
 Internally, y-leveldb uses [`level`](https://github.com/Level/level) which
